@@ -7,6 +7,10 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using System.Net;
+using System.Net.Sockets;
+using System.IO;
+using System.Threading;
 
 namespace Shoot_Out_Game_MOO_ICT
 {
@@ -19,9 +23,14 @@ namespace Shoot_Out_Game_MOO_ICT
         int speed = 10;
         int ammo = 10;
         int zombieSpeed = 3;
+        List<string> users = new List<string>();
+        List<PictureBox> players = new List<PictureBox>();
+        List<Point> pos = new List<Point>();
+        public int globalport = 11000;
         Random randNum = new Random();
         int score;
         List<PictureBox> zombiesList = new List<PictureBox>();
+         string[] ips = "116,121,126,127,99,98,97,102,137,124,103,107,129,105,106".Split(',');
 
 
 
@@ -89,26 +98,26 @@ namespace Shoot_Out_Game_MOO_ICT
                     }
 
 
-                    if (x.Left > player.Left)
-                    {
-                        x.Left -= zombieSpeed;
-                        ((PictureBox)x).Image = Properties.Resources.zleft;
-                    }
-                    if (x.Left < player.Left)
-                    {
-                        x.Left += zombieSpeed;
-                        ((PictureBox)x).Image = Properties.Resources.zright;
-                    }
-                    if (x.Top > player.Top)
-                    {
-                        x.Top -= zombieSpeed;
-                        ((PictureBox)x).Image = Properties.Resources.zup;
-                    }
-                    if (x.Top < player.Top)
-                    {
-                        x.Top += zombieSpeed;
-                        ((PictureBox)x).Image = Properties.Resources.zdown;
-                    }
+                    //if (x.Left > player.Left)
+                    //{
+                    //    x.Left -= zombieSpeed;
+                    //    ((PictureBox)x).Image = Properties.Resources.zleft;
+                    //}
+                    //if (x.Left < player.Left)
+                    //{
+                    //    x.Left += zombieSpeed;
+                    //    ((PictureBox)x).Image = Properties.Resources.zright;
+                    //}
+                    //if (x.Top > player.Top)
+                    //{
+                    //    x.Top -= zombieSpeed;
+                    //    ((PictureBox)x).Image = Properties.Resources.zup;
+                    //}
+                    //if (x.Top < player.Top)
+                    //{
+                    //    x.Top += zombieSpeed;
+                    //    ((PictureBox)x).Image = Properties.Resources.zdown;
+                    //}
 
                 }
 
@@ -127,11 +136,23 @@ namespace Shoot_Out_Game_MOO_ICT
                             this.Controls.Remove(x);
                             ((PictureBox)x).Dispose();
                             zombiesList.Remove(((PictureBox)x));
-                            MakeZombies();
+
+                            for (int i = 0; i < ips.Length; i++)
+                            {
+                                MakeZombies(Convert.ToInt32(ips[i]), i);
+                            }
+                            Thread s = new Thread(move);
+                            s.Start();
                         }
                     }
                 }
+                //for (int i = 0; i < ips.Length; i++)
+                //{
+                //    MakeZombies(Convert.ToInt32(ips[i]), i);
+                //}
 
+                //Thread s = new Thread(move);
+                //s.Start();
 
             }
 
@@ -219,6 +240,18 @@ namespace Shoot_Out_Game_MOO_ICT
 
         }
 
+        //private void Form1_Load(object sender, EventArgs e)
+        //{
+
+        //    for (int i = 0; i < ips.Length; i++)
+        //    {
+        //        MakeZombies(Convert.ToInt32(ips[i]), i);
+        //    }
+
+        //    Thread s = new Thread(move);
+        //    s.Start();
+        //}
+
         private void ShootBullet(string direction)
         {
             Bullet shootBullet = new Bullet();
@@ -228,8 +261,14 @@ namespace Shoot_Out_Game_MOO_ICT
             shootBullet.MakeBullet(this);
         }
 
-        private void MakeZombies()
+        /// <summary>
+        /// Funtion <c>MakeZombies</c> MakeZombies work as spwan code 
+        /// </summary>
+        private void MakeZombies(int i, int id)
         {
+            //192.168.3.106
+            //users.Add("172.16.1." + i);
+            users.Add("192.168.3." + i);
             PictureBox zombie = new PictureBox();
             zombie.Tag = "zombie";
             zombie.Image = Properties.Resources.zdown;
@@ -239,9 +278,32 @@ namespace Shoot_Out_Game_MOO_ICT
             zombiesList.Add(zombie);
             this.Controls.Add(zombie);
             player.BringToFront();
+            Thread n = new Thread(() => read(id, i));
+            n.Start();
 
         }
+        public void read(int id, int ipp)
+        {
+            bool done = false;
+            int listenPort = globalport;
+            using (UdpClient listener = new UdpClient(ipp * 10))
+            {
 
+                while (!done)
+                {
+
+
+
+                    IPEndPoint listenEndPoint = new IPEndPoint(IPAddress.Parse(users[id]), ipp * 10);
+                    byte[] receivedData = listener.Receive(ref listenEndPoint);
+                    string n = Encoding.Unicode.GetString(receivedData);
+
+                    pos[id] = new Point(Convert.ToInt32(n.Split(',')[0]), Convert.ToInt32(n.Split(',')[1]));
+                    //should be "Hello World" sent from above client
+                }
+            }
+
+        }
         private void DropAmmo()
         {
 
@@ -259,7 +321,38 @@ namespace Shoot_Out_Game_MOO_ICT
 
 
         }
+        public void set()
+        {
+            if (this.InvokeRequired == true)
+            {
+                this.Invoke(new MethodInvoker(set));
 
+            }
+            else
+            {
+                for (int i = 0; i < players.Count; i++)
+                {
+                    players[i].Left = pos[i].X;
+                    players[i].Top = pos[i].Y;
+                }
+            }
+        }
+        public void move()
+        {
+            while (true)
+            {
+                try
+                {
+                    set();
+                    Thread.Sleep(1);
+                }
+                catch (Exception e)
+                {
+
+                }
+            }
+
+        }
         private void RestartGame()
         {
             player.Image = Properties.Resources.up;
@@ -271,10 +364,10 @@ namespace Shoot_Out_Game_MOO_ICT
 
             zombiesList.Clear();
 
-            for (int i = 0; i < 3; i++)
-            {
-                MakeZombies();
-            }
+            //for (int i = 0; i < 3; i++)
+            //{
+            //    MakeZombies();
+            //}
 
             goUp = false;
             goDown = false;
